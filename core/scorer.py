@@ -64,19 +64,25 @@ def load_models():
     return bi, cross
 
 
-def signal_section_semantic(chunks, jd_embedding, bi_encoder):
-    texts = [c["text"] for c in chunks]
-    embeddings = bi_encoder.encode(
-        texts, convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False
-    )
-    sims = embeddings @ jd_embedding
-
-    section_scores = {}
-    for chunk, sim in zip(chunks, sims):
-        sec = chunk["section"]
-        section_scores.setdefault(sec, []).append(float(sim))
-
-    section_max = {sec: max(scores) for sec, scores in section_scores.items()}
+def signal_section_semantic(chunks, jd_embedding, bi_encoder, collection=None):
+    if collection is not None:
+        from core.store import query_all_sections
+        section_hits = query_all_sections(collection, jd_embedding, n_per_section=3)
+        section_max = {}
+        for sec, hits in section_hits.items():
+            scores = [h["similarity"] for h in hits]
+            section_max[sec] = 0.7 * max(scores) + 0.3 * (sum(scores) / len(scores))
+    else:
+        texts = [c["text"] for c in chunks]
+        embeddings = bi_encoder.encode(
+            texts, convert_to_numpy=True, normalize_embeddings=True, show_progress_bar=False
+        )
+        sims = embeddings @ jd_embedding
+        section_scores = {}
+        for chunk, sim in zip(chunks, sims):
+            sec = chunk["section"]
+            section_scores.setdefault(sec, []).append(float(sim))
+        section_max = {sec: max(scores) for sec, scores in section_scores.items()}
 
     total_weight = 0.0
     weighted_sum = 0.0
@@ -120,8 +126,9 @@ def compute_all_signals(
     jd_profile,
     bi_encoder,
     cross_encoder,
+    collection=None,
 ):
-    s1, section_breakdown = signal_section_semantic(chunks, jd_embedding, bi_encoder)
+    s1, section_breakdown = signal_section_semantic(chunks, jd_embedding, bi_encoder, collection=collection)
 
     texts = [c["text"] for c in chunks]
     raw_embeds = bi_encoder.encode(
