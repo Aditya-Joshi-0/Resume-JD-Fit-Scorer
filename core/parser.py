@@ -25,7 +25,7 @@ def _get_ocr_engine():
     if _ocr_engine is None:
         from paddleocr import PaddleOCR
         # lang='en', use_angle_cls detects rotated text (common in scanned docs)
-        _ocr_engine = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+        _ocr_engine = PaddleOCR(lang="en", enable_mkldnn=False)
     return _ocr_engine
 
 
@@ -49,7 +49,7 @@ def _ocr_pdf(file) -> str:
             img = page.to_image(resolution=200).original
             img_array = np.array(img)
 
-            result = ocr.ocr(img_array, cls=True)
+            result = ocr.predict(img_array)
 
             if result and result[0]:
                 page_lines = [
