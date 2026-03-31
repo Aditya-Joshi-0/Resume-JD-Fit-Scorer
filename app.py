@@ -67,9 +67,9 @@ with col_r:
  
 btn_c1, btn_c2 = st.columns([3, 1], gap="small")
 with btn_c1:
-    analyse = st.button("◈ Analyse fit", type="primary", use_container_width=True)
+    analyse = st.button("◈ Analyse fit", type="primary", use_container_width='stretch')
 with btn_c2:
-    use_sample = st.button("Try sample ↗", use_container_width=True, help="Load a sample ML resume + JD")
+    use_sample = st.button("Try sample ↗", use_container_width='stretch', help="Load a sample ML resume + JD")
  
 if use_sample:
     st.session_state["sample_mode"] = True
@@ -135,7 +135,7 @@ def render_gauge(score):
         font={"color":"#e2e2f0"},
         margin=dict(t=20,b=0,l=10,r=10), height=180,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width='stretch')
  
 def render_radar(signal_scores):
     labels = {
@@ -159,7 +159,7 @@ def render_radar(signal_scores):
         paper_bgcolor="#0d0d0f", showlegend=False,
         margin=dict(t=20,b=20,l=30,r=30), height=300,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width='stretch')
  
  
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -323,7 +323,7 @@ if llm_analysis:
     st.download_button(
         "⬇ Download full report (.md)", data=report_md,
         file_name="fit_report.md", mime="text/markdown",
-        use_container_width=True,
+        use_container_width='stretch',
     )
  
 st.markdown("<hr class='divider'>", unsafe_allow_html=True)
@@ -459,7 +459,7 @@ with tab_coverage:
             xaxis=dict(gridcolor="#1e1e2e",linecolor="#1e1e2e"),
             yaxis=dict(gridcolor="#1e1e2e",linecolor="#1e1e2e",title="Reqs"),
         )
-        st.plotly_chart(fig_hm, use_container_width=True)
+        st.plotly_chart(fig_hm, use_container_width='stretch')
  
     st.markdown("**Per-requirement evidence**")
     # Filters — stored in session state so they don't wipe results
