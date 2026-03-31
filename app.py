@@ -9,7 +9,9 @@ from core.entities import build_entity_profile
 from core.scorer import load_models, compute_all_signals
 from core.store import build_collection
 from core.gap_analysis import run_gap_analysis
-from core.llm import analyse_with_llm
+from core.llm import analyse_with_llm, generate_rewrites, generate_interview_prep
+from core.report import generate_report
+from core.sample_data import SAMPLE_RESUME, SAMPLE_JD
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -20,7 +22,8 @@ st.set_page_config(
 )
 
 # ── Custom CSS ────────────────────────────────────────────────────────────────
-apply_theme()
+apply_theme()  # see styles.py for CSS definitions
+
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("## ◈ Resume × JD Fit Scorer")
@@ -30,7 +33,10 @@ st.markdown(
 )
 
 # ── Groq key check ────────────────────────────────────────────────────────────
-groq_key = os.getenv("GROQ_API_KEY", "")
+get_settings()
+settings = get_settings()
+
+groq_key = settings.groq_api_key
 if not groq_key:
     with st.expander("⚙️ Groq API key required for LLM analysis", expanded=True):
         key_input = st.text_input(
@@ -60,7 +66,28 @@ with col_r:
         label_visibility="collapsed",
     )
 
-analyse = st.button("◈ Analyse fit", type="primary", use_container_width=True)
+# ── Action buttons ────────────────────────────────────────────────────────────
+btn_col1, btn_col2 = st.columns([3, 1], gap="small")
+with btn_col1:
+    analyse = st.button("◈ Analyse fit", type="primary", use_container_width=True)
+with btn_col2:
+    use_sample = st.button("Try sample ↗", use_container_width=True, help="Load a sample ML resume + JD to demo the tool")
+
+# Wire sample data into session state
+if use_sample:
+    st.session_state["sample_mode"] = True
+    st.rerun()
+
+sample_mode = st.session_state.get("sample_mode", False)
+if sample_mode:
+    st.markdown(
+        "<div style='background:#0b1f14;border:1px solid #166534;border-radius:8px;"
+        "padding:0.6rem 1rem;font-size:0.83rem;color:#4ade80;margin-bottom:0.5rem;'>"
+        "◉ Demo mode — using sample ML resume + senior ML engineer JD. "
+        "<span style=\'cursor:pointer;text-decoration:underline;\' "
+        "onclick=\'window.location.reload()\'>Clear</span></div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ── Helper renderers ──────────────────────────────────────────────────────────
@@ -82,6 +109,45 @@ def score_colour(score: float) -> str:
     if score >= 75: return "#4ade80"
     if score >= 50: return "#fb923c"
     return "#f87171"
+
+
+def render_gauge(score: float) -> None:
+    """Arc gauge using plotly indicator."""
+    colour = score_colour(score)
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=score,
+        number={"font": {"size": 42, "color": colour, "family": "DM Mono, monospace"}, "suffix": ""},
+        gauge={
+            "axis": {
+                "range": [0, 100],
+                "tickwidth": 0,
+                "tickcolor": "#1e1e2e",
+                "tickfont": {"color": "#6b7280", "size": 10},
+            },
+            "bar":             {"color": colour,    "thickness": 0.22},
+            "bgcolor":         "#13131d",
+            "borderwidth":     0,
+            "steps": [
+                {"range": [0,  50],  "color": "#0d0d0f"},
+                {"range": [50, 75],  "color": "#0d0d0f"},
+                {"range": [75, 100], "color": "#0d0d0f"},
+            ],
+            "threshold": {
+                "line":  {"color": colour, "width": 3},
+                "thickness": 0.75,
+                "value": score,
+            },
+        },
+    ))
+    fig.update_layout(
+        paper_bgcolor="#0d0d0f",
+        plot_bgcolor="#0d0d0f",
+        font={"color": "#e2e2f0"},
+        margin=dict(t=30, b=0, l=20, r=20),
+        height=200,
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def render_radar(signal_scores: dict) -> None:
@@ -405,13 +471,20 @@ def render_section_heatmap(heatmap: list) -> None:
 
 # ── Main analysis flow ────────────────────────────────────────────────────────
 
-if analyse:
-    if not uploaded_file:
-        st.warning("Upload your resume PDF.")
-        st.stop()
-    if not jd_text.strip():
-        st.warning("Paste a job description.")
-        st.stop()
+if analyse or sample_mode:
+    # ── Input resolution (real upload or sample data) ─────────────────────
+    if sample_mode:
+        resume_text_raw = SAMPLE_RESUME
+        jd_text = SAMPLE_JD
+        uploaded_file = None
+    else:
+        if not uploaded_file:
+            st.warning("Upload your resume PDF.")
+            st.stop()
+        if not jd_text.strip():
+            st.warning("Paste a job description.")
+            st.stop()
+        resume_text_raw = None   # will be set after PDF extraction
 
     progress = st.progress(0, text="Loading models...")
 
@@ -419,12 +492,15 @@ if analyse:
         bi_encoder, cross_encoder = load_models()
     progress.progress(15, text="Extracting resume text...")
 
-    resume_text, extract_method = extract_text_from_pdf(uploaded_file)
-    if not resume_text:
-        st.error("Could not extract text. Try a non-scanned PDF or improve scan quality.")
-        st.stop()
-    if extract_method == "ocr":
-        st.info("🔍 Scanned PDF — OCR used. Accuracy depends on scan quality.")
+    if sample_mode:
+        resume_text = resume_text_raw
+    else:
+        resume_text, extract_method = extract_text_from_pdf(uploaded_file)
+        if not resume_text:
+            st.error("Could not extract text. Try a non-scanned PDF or improve scan quality.")
+            st.stop()
+        if extract_method == "ocr":
+            st.info("🔍 Scanned PDF — OCR used. Accuracy depends on scan quality.")
 
     sections = parse_sections(resume_text)
     chunks = chunk_resume(sections)
@@ -464,47 +540,92 @@ if analyse:
     progress.progress(82, text="Running LLM deep analysis...")
 
     llm_analysis = {}
+    rewrites = {}
+    interview_prep = {}
     try:
         llm_analysis = analyse_with_llm(resume_text, jd_text)
     except Exception as e:
         st.warning(f"LLM analysis skipped: {e}")
 
+    progress.progress(90, text="Generating resume rewrites...")
+    if llm_analysis:
+        try:
+            rewrites = generate_rewrites(
+                resume_text, jd_text,
+                llm_analysis.get("priority_gaps", []),
+            )
+        except Exception as e:
+            st.warning(f"Rewrite suggestions skipped: {e}")
+
+    progress.progress(96, text="Generating interview prep...")
+    if llm_analysis:
+        try:
+            interview_prep = generate_interview_prep(
+                resume_text, jd_text,
+                llm_analysis.get("priority_gaps", []),
+            )
+        except Exception as e:
+            st.warning(f"Interview prep skipped: {e}")
+
     progress.progress(100, text="Done.")
     progress.empty()
 
+    # ── Download report ───────────────────────────────────────────────────────
+    if llm_analysis:
+        report_md = generate_report(result, gap_result, llm_analysis, rewrites, interview_prep)
+        st.download_button(
+            label="⬇ Download full report (.md)",
+            data=report_md,
+            file_name="fit_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+
     # ── Panel 1: Score hero ───────────────────────────────────────────────────
-    verdict = llm_analysis.get("overall_verdict", "")
+    verdict       = llm_analysis.get("overall_verdict", "")
     verdict_reason = llm_analysis.get("verdict_reasoning", "")
-    v_cls = verdict_class(verdict)
-    score_colour_val = score_colour(result.final_score)
+    v_cls         = verdict_class(verdict)
 
-    st.markdown(f"""
-    <div class='score-hero'>
-      <div class='score-number'>{result.final_score}</div>
-      <div class='score-label'>Overall fit score / 100</div>
-      {'<div class="verdict-badge ' + v_cls + '">' + verdict + '</div>' if verdict else ''}
-      {'<p style="color:#9ca3af;font-size:0.85rem;margin-top:0.8rem;max-width:600px;margin-left:auto;margin-right:auto;">' + verdict_reason + '</p>' if verdict_reason else ''}
-    </div>
-    """, unsafe_allow_html=True)
+    hero_left, hero_right = st.columns([1, 2], gap="large")
 
-    # Mini signal metrics
-    signal_labels = {
-        "section_semantic": "Section semantic",
-        "cross_encoder": "Contextual match",
-        "tool_f1": "Tool F1",
-        "domain_coverage": "Domain coverage",
-        "experience_fit": "Experience fit",
-    }
-    cols = st.columns(5)
-    for col, (k, label) in zip(cols, signal_labels.items()):
-        val = result.signal_scores.get(k, 0)
-        c = score_colour(val)
-        col.markdown(f"""
-        <div class='metric-mini'>
-          <div class='metric-mini-val' style='color:{c};'>{val:.0f}</div>
-          <div class='metric-mini-label'>{label}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with hero_left:
+        st.markdown(
+            "<div class='score-hero' style='padding:1.5rem;'>",
+            unsafe_allow_html=True,
+        )
+        render_gauge(result.final_score)
+        if verdict:
+            st.markdown(
+                f"<div style='text-align:center;'>"
+                f"<span class='verdict-badge {v_cls}'>{verdict}</span></div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with hero_right:
+        if verdict_reason:
+            st.markdown(
+                f"<p style='color:#c4c4d4;font-size:0.95rem;line-height:1.8;"
+                f"margin-top:1.5rem;'>{verdict_reason}</p>",
+                unsafe_allow_html=True,
+            )
+        signal_labels = {
+            "section_semantic": "Section semantic",
+            "cross_encoder":    "Contextual match",
+            "tool_f1":          "Tool F1",
+            "domain_coverage":  "Domain coverage",
+            "experience_fit":   "Experience fit",
+        }
+        cols = st.columns(5)
+        for col, (k, label) in zip(cols, signal_labels.items()):
+            val = result.signal_scores.get(k, 0)
+            c = score_colour(val)
+            col.markdown(
+                f"<div class='metric-mini'>"
+                f"<div class='metric-mini-val' style='color:{c};'>{val:.0f}</div>"
+                f"<div class='metric-mini-label'>{label}</div></div>",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
@@ -665,8 +786,170 @@ if analyse:
     else:
         st.info("Add a Groq API key to unlock LLM-powered deep analysis.")
 
+    # ── Panel 7: Resume rewrite suggestions ──────────────────────────────────
+    if rewrites:
+        st.markdown("<hr class='divider'>", unsafe_allow_html=True)
+        st.markdown("### Resume rewrite suggestions")
+        st.markdown(
+            "<p style='color:#6b7280;font-size:0.85rem;'>"
+            "LLM-generated, gap-targeted rewrites for your resume. "
+            "Copy-paste directly into your resume.</p>",
+            unsafe_allow_html=True,
+        )
+
+        # Quick wins first — high value, low effort
+        quick_wins = rewrites.get("quick_wins", [])
+        if quick_wins:
+            qw_items = "".join(
+                f"<li style='margin-bottom:0.4rem;color:#c4c4d4;font-size:0.87rem;'>"
+                f"<span style='color:#a78bfa;'>→</span> {qw}</li>"
+                for qw in quick_wins
+            )
+            st.markdown(
+                f"<div class='section-card' style='margin-bottom:1.5rem;'>"
+                f"<div class='section-card-title'>Quick wins — under 5 minutes each</div>"
+                f"<ul style='margin:0;padding-left:0.5rem;list-style:none;'>{qw_items}</ul>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        # Summary rewrite
+        summary_rw = rewrites.get("summary_rewrite", {})
+        if summary_rw:
+            st.markdown("**Summary / Objective rewrite**")
+            rw_c1, rw_c2 = st.columns(2, gap="large")
+            with rw_c1:
+                st.markdown(
+                    f"<div class='section-card'>"
+                    f"<div class='section-card-title'>Current</div>"
+                    f"<p style='color:#6b7280;font-size:0.85rem;line-height:1.7;'>"
+                    f"{summary_rw.get('original','—')}</p></div>",
+                    unsafe_allow_html=True,
+                )
+            with rw_c2:
+                st.markdown(
+                    f"<div class='section-card' style='border-color:#3730a3;'>"
+                    f"<div class='section-card-title' style='color:#a78bfa;'>Suggested</div>"
+                    f"<p style='color:#e2e2f0;font-size:0.85rem;line-height:1.7;'>"
+                    f"{summary_rw.get('rewritten','—')}</p>"
+                    f"<div style='font-size:0.78rem;color:#6b7280;margin-top:0.5rem;'>"
+                    f"{summary_rw.get('why','')}</div></div>",
+                    unsafe_allow_html=True,
+                )
+
+        # Section rewrites
+        for rw in rewrites.get("rewrite_suggestions", []):
+            section_name = rw.get("section", "Section")
+            kws = rw.get("keywords_added", [])
+            kw_chips = " ".join(
+                f"<span style='background:#1e1b4b;color:#a5b4fc;border:1px solid #3730a3;"
+                f"border-radius:4px;padding:1px 7px;font-size:0.7rem;"
+                f"font-family:DM Mono,monospace;'>{k}</span>"
+                for k in kws
+            )
+            st.markdown(f"**{section_name} rewrite**")
+            rc1, rc2 = st.columns(2, gap="large")
+            with rc1:
+                st.markdown(
+                    f"<div class='section-card'>"
+                    f"<div class='section-card-title'>Current</div>"
+                    f"<p style='color:#6b7280;font-size:0.85rem;line-height:1.7;'>"
+                    f"{rw.get('original_snippet','—')}</p></div>",
+                    unsafe_allow_html=True,
+                )
+            with rc2:
+                st.markdown(
+                    f"<div class='section-card' style='border-color:#3730a3;'>"
+                    f"<div class='section-card-title' style='color:#a78bfa;'>Suggested</div>"
+                    f"<p style='color:#e2e2f0;font-size:0.85rem;line-height:1.7;'>"
+                    f"{rw.get('rewritten','—')}</p>"
+                    f"<div style='font-size:0.78rem;color:#6b7280;margin-top:0.5rem;'>"
+                    f"{rw.get('why','')}</div>"
+                    f"{'''<div style='margin-top:0.5rem;'>''' + kw_chips + '''</div>''' if kw_chips else ''}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+    # ── Panel 8: Interview prep ───────────────────────────────────────────────
+    if interview_prep:
+        st.markdown("<hr class='divider'>", unsafe_allow_html=True)
+        st.markdown("### Interview prep")
+        st.markdown(
+            "<p style='color:#6b7280;font-size:0.85rem;'>"
+            "Tailored questions and talking points based on your resume and this specific JD.</p>",
+            unsafe_allow_html=True,
+        )
+
+        CAT_COLOURS = {
+            "Technical":     ("#0c447c", "#60a5fa"),
+            "System Design": ("#3730a3", "#a5b4fc"),
+            "Behavioural":   ("#065f46", "#34d399"),
+            "Gap-related":   ("#7f1d1d", "#f87171"),
+        }
+
+        for q in interview_prep.get("likely_questions", []):
+            cat      = q.get("category", "Technical")
+            bg, fg   = CAT_COLOURS.get(cat, ("#1e1e2e", "#e2e2f0"))
+            tps      = q.get("talking_points", [])
+            tp_html  = "".join(
+                f"<li style='color:#bbf7d0;font-size:0.83rem;margin-bottom:0.3rem;'>{tp}</li>"
+                for tp in tps
+            )
+            wo       = q.get("watch_out", "")
+            wo_html  = (
+                f"<div style='margin-top:0.6rem;font-size:0.8rem;color:#fca5a5;'>"
+                f"⚠️ Watch out: {wo}</div>"
+            ) if wo else ""
+
+            st.markdown(
+                f"<div class='section-card' style='margin-bottom:1rem;'>"
+                f"<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:0.6rem;'>"
+                f"<div style='font-weight:600;color:#e2e2f0;font-size:0.9rem;'>{q.get('question','')}</div>"
+                f"<span style='background:{bg};color:{fg};border:1px solid {fg}33;"
+                f"border-radius:999px;padding:2px 10px;font-size:0.7rem;white-space:nowrap;"
+                f"font-family:DM Mono,monospace;'>{cat}</span>"
+                f"</div>"
+                f"<div style='font-size:0.8rem;color:#6b7280;margin-bottom:0.6rem;'>"
+                f"Why asked: {q.get('why_asked','')}</div>"
+                f"<ul style='margin:0;padding-left:1rem;'>{tp_html}</ul>"
+                f"{wo_html}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        # System design topic
+        sd = interview_prep.get("system_design_topic", {})
+        if sd:
+            sd_pts = "".join(
+                f"<li style='color:#c4c4d4;font-size:0.85rem;margin-bottom:0.3rem;'>{pt}</li>"
+                for pt in sd.get("suggested_approach", [])
+            )
+            st.markdown(
+                f"<div class='section-card' style='border-color:#3730a3;margin-bottom:1rem;'>"
+                f"<div class='section-card-title' style='color:#a78bfa;'>System design topic</div>"
+                f"<div style='font-weight:600;color:#e2e2f0;margin-bottom:0.6rem;'>{sd.get('topic','')}</div>"
+                f"<ul style='margin:0;padding-left:1rem;'>{sd_pts}</ul>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        # Questions to ask interviewer
+        q2ask = interview_prep.get("questions_to_ask_interviewer", [])
+        if q2ask:
+            q2ask_items = "".join(
+                f"<li style='color:#c4c4d4;font-size:0.85rem;margin-bottom:0.4rem;'>{q}</li>"
+                for q in q2ask
+            )
+            st.markdown(
+                f"<div class='section-card' style='border-color:#0f6e56;margin-bottom:1rem;'>"
+                f"<div class='section-card-title' style='color:#2dd4bf;'>Questions to ask the interviewer</div>"
+                f"<ul style='margin:0;padding-left:1rem;'>{q2ask_items}</ul>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
     # Debug expander
     with st.expander("Debug — resume sections"):
-        for sec, content in sections.items():
-            st.markdown(f"**{sec.title()}** ({len(content.split())} words)")
-            st.text(content[:300] + ("..." if len(content) > 300 else ""))
+        for sec, sec_content in sections.items():
+            st.markdown(f"**{sec.title()}** ({len(sec_content.split())} words)")
+            st.text(sec_content[:300] + ("..." if len(sec_content) > 300 else ""))

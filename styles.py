@@ -10,15 +10,15 @@ import streamlit as st
 THEME_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap');
- 
+
 html, body, [class*="css"] {
     font-family: 'Syne', sans-serif;
 }
- 
+
 .stApp { background: #0d0d0f; }
- 
+
 h1, h2, h3 { font-family: 'Syne', sans-serif; }
- 
+
 .score-hero {
     background: linear-gradient(135deg, #1a1a24 0%, #12121a 100%);
     border: 1px solid #2a2a3a;
@@ -56,7 +56,7 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
 .verdict-good     { background: #042f2e; color: #2dd4bf; border: 1px solid #115e59; }
 .verdict-moderate { background: #2d1a0a; color: #fb923c; border: 1px solid #7c2d12; }
 .verdict-weak     { background: #2d0a0a; color: #f87171; border: 1px solid #7f1d1d; }
- 
+
 .section-card {
     background: #13131d;
     border: 1px solid #1e1e2e;
@@ -77,11 +77,11 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
     border-radius: 2px;
     margin: 0.6rem 0;
 }
- 
+
 .pill-strong { background: #052e16; color: #4ade80; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; }
 .pill-partial { background: #2d1a0a; color: #fb923c; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; }
 .pill-weak    { background: #2d0a0a; color: #f87171; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; }
- 
+
 .insight-block {
     background: #13131d;
     border-left: 3px solid #7c3aed;
@@ -92,11 +92,11 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
     font-size: 0.9rem;
     line-height: 1.7;
 }
- 
+
 .gap-high   { border-left-color: #ef4444; }
 .gap-medium { border-left-color: #f59e0b; }
 .gap-low    { border-left-color: #10b981; }
- 
+
 .strength-block {
     background: #0b1f14;
     border: 1px solid #14532d;
@@ -106,7 +106,7 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
     color: #bbf7d0;
     font-size: 0.88rem;
 }
- 
+
 .tool-chip {
     display: inline-block;
     font-family: 'DM Mono', monospace;
@@ -118,7 +118,7 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
 .tool-match   { background: #052e16; color: #4ade80; border: 1px solid #166534; }
 .tool-missing { background: #2d0a0a; color: #f87171; border: 1px solid #7f1d1d; }
 .tool-bonus   { background: #1e1b4b; color: #a5b4fc; border: 1px solid #3730a3; }
- 
+
 .metric-mini {
     background: #13131d;
     border: 1px solid #1e1e2e;
@@ -138,9 +138,9 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
     letter-spacing: 0.08em;
     margin-top: 0.3rem;
 }
- 
+
 .divider { border: none; border-top: 1px solid #1e1e2e; margin: 2rem 0; }
- 
+
 .rec-block {
     background: #11131f;
     border: 1px solid #2a2d4a;
