@@ -12,6 +12,7 @@ class Settings(BaseModel):
     nvidia_api_key: str
     llm_model: str
     embedding_model: str
+    debug_mode: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -21,6 +22,7 @@ class Settings(BaseModel):
             nvidia_api_key=os.getenv("NVIDIA_API_KEY", ""),
             llm_model=os.getenv("LLM_MODEL", ""),
             embedding_model=os.getenv("EMBEDDING_MODEL", ""),
+            debug_mode=os.getenv("DEBUG_MODE", False)
         )
 
 @lru_cache(maxsize=1)

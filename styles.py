@@ -55,6 +55,21 @@ h1,h2,h3 { font-family: 'Syne', sans-serif; }
 .stTabs [data-baseweb="tab-list"] { background:#13131d;border-radius:10px;padding:4px;gap:4px; }
 .stTabs [data-baseweb="tab"] { border-radius:8px;padding:0.4rem 1rem;font-size:0.85rem;color:#6b7280; }
 .stTabs [aria-selected="true"] { background:#1e1e2e;color:#e2e2f0; }
+
+/* Full-width segmented control */
+div[data-testid="stSegmentedControl"] [role="radiogroup"] {
+    gap: 0.4rem;
+}
+
+div[data-testid="stSegmentedControl"] [role="radio"] {
+    flex: 1 1 0;
+    justify-content: center;
+}
+
+div[data-testid="stSegmentedControl"] [role="radio"][aria-checked="true"] {
+    background: #1e1e2e !important;
+    border-color: #3730a3 !important;
+}
 </style>
 """
 

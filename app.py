@@ -40,8 +40,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Groq key check ────────────────────────────────────────────────────────────
-get_settings()
+# ── Load environment variables ────────────────────────────────────────────────────────────
 settings = get_settings()
 
 groq_key = settings.groq_api_key
@@ -302,7 +301,7 @@ with banner_l:
     render_gauge(result.final_score)
     if verdict:
         st.markdown(
-            f"<div style='text-align:center;margin-top:0.4rem;'>"
+            f"<div style='text-align:center;margin-top:0.4rem;margin-bottom:0.4rem'>"
             f"<span class='verdict-badge {v_cls}'>{verdict}</span></div>",
             unsafe_allow_html=True,
         )
@@ -351,6 +350,7 @@ active_tab = st.segmented_control(
     ],
     key="active_tab",
     label_visibility="collapsed",
+    width="stretch",
 )
  
 # ── TAB 1: Overview ───────────────────────────────────────────────────────────
@@ -821,7 +821,8 @@ if active_tab == "🎯 Interview Prep":
         )
  
 # Debug
-with st.expander("Debug — resume sections detected", expanded=False):
-    for sec, sec_content in sections.items():
-        st.markdown(f"**{sec.title()}** — {len(sec_content.split())} words")
-        st.text(sec_content[:300] + ("..." if len(sec_content) > 300 else ""))
+if settings.debug_mode:
+    with st.expander("Debug — resume sections detected", expanded=False):
+        for sec, sec_content in sections.items():
+            st.markdown(f"**{sec.title()}** — {len(sec_content.split())} words")
+            st.text(sec_content[:300] + ("..." if len(sec_content) > 300 else ""))
