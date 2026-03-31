@@ -23,6 +23,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Initialize tab widget states at the top level to prevent Streamlit from 
+# resetting the active tab on the first interaction.
+st.session_state.setdefault("cov_filter", "All")
+st.session_state.setdefault("req_sort", "JD emphasis (high → low)")
+st.session_state.setdefault("interview_cat_filter", "All")
+
 # ── Custom CSS ────────────────────────────────────────────────────────────────
 apply_theme()  # see styles.py for CSS definitions
 
@@ -67,9 +73,9 @@ with col_r:
  
 btn_c1, btn_c2 = st.columns([3, 1], gap="small")
 with btn_c1:
-    analyse = st.button("◈ Analyse fit", type="primary", use_container_width='stretch')
+    analyse = st.button("◈ Analyse fit", type="primary", width='stretch')
 with btn_c2:
-    use_sample = st.button("Try sample ↗", use_container_width='stretch', help="Load a sample ML resume + JD")
+    use_sample = st.button("Try sample ↗", width='stretch', help="Load a sample ML resume + JD")
  
 if use_sample:
     st.session_state["sample_mode"] = True
@@ -135,7 +141,7 @@ def render_gauge(score):
         font={"color":"#e2e2f0"},
         margin=dict(t=20,b=0,l=10,r=10), height=180,
     )
-    st.plotly_chart(fig, use_container_width='stretch')
+    st.plotly_chart(fig, width='stretch')
  
 def render_radar(signal_scores):
     labels = {
@@ -159,7 +165,7 @@ def render_radar(signal_scores):
         paper_bgcolor="#0d0d0f", showlegend=False,
         margin=dict(t=20,b=20,l=30,r=30), height=300,
     )
-    st.plotly_chart(fig, use_container_width='stretch')
+    st.plotly_chart(fig, width='stretch')
  
  
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -323,7 +329,7 @@ if llm_analysis:
     st.download_button(
         "⬇ Download full report (.md)", data=report_md,
         file_name="fit_report.md", mime="text/markdown",
-        use_container_width='stretch',
+        width='stretch',
     )
  
 st.markdown("<hr class='divider'>", unsafe_allow_html=True)
@@ -332,27 +338,23 @@ st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tabbed results
 # ═══════════════════════════════════════════════════════════════════════════════
- 
-# Pre-initialise every widget key that lives inside a tab.
-# Without this, the first interaction with any widget creates its session_state
-# key mid-rerun, Streamlit treats it as a "new" widget, and resets the active
-# tab back to index 0 (Overview). Initialising here before st.tabs() is called
-# prevents that reset entirely.
-st.session_state.setdefault("cov_filter", "All")
-st.session_state.setdefault("req_sort", "JD emphasis (high → low)")
-st.session_state.setdefault("interview_cat_filter", "All")
- 
-tab_overview, tab_coverage, tab_skills, tab_improve, tab_interview = st.tabs([
-    "📊 Overview",
-    "🔍 Coverage",
-    "🛠 Skills & Tools",
-    "✍ Improve",
-    "🎯 Interview Prep",
-])
- 
+st.session_state.setdefault("active_tab", "📊 Overview")
+
+active_tab = st.segmented_control(
+    "Section",
+    [
+        "📊 Overview",
+        "🔍 Coverage",
+        "🛠 Skills & Tools",
+        "✍ Improve",
+        "🎯 Interview Prep",
+    ],
+    key="active_tab",
+    label_visibility="collapsed",
+)
  
 # ── TAB 1: Overview ───────────────────────────────────────────────────────────
-with tab_overview:
+if active_tab == "📊 Overview":
     t1_l, t1_r = st.columns([1, 1], gap="large")
  
     with t1_l:
@@ -418,7 +420,7 @@ with tab_overview:
  
  
 # ── TAB 2: Coverage ───────────────────────────────────────────────────────────
-with tab_coverage:
+if active_tab == "🔍 Coverage":
     reqs = gap_result.requirements
     total   = len(reqs)
     strong_n  = sum(1 for r in reqs if r.coverage_label=="strong")
@@ -459,7 +461,7 @@ with tab_coverage:
             xaxis=dict(gridcolor="#1e1e2e",linecolor="#1e1e2e"),
             yaxis=dict(gridcolor="#1e1e2e",linecolor="#1e1e2e",title="Reqs"),
         )
-        st.plotly_chart(fig_hm, use_container_width='stretch')
+        st.plotly_chart(fig_hm, width='stretch')
  
     st.markdown("**Per-requirement evidence**")
     # Filters — stored in session state so they don't wipe results
@@ -530,7 +532,7 @@ with tab_coverage:
  
  
 # ── TAB 3: Skills & Tools ─────────────────────────────────────────────────────
-with tab_skills:
+if active_tab == "🛠 Skills & Tools":
     to = result.tool_overlap
  
     st.markdown("**Tool alignment**")
@@ -608,7 +610,7 @@ with tab_skills:
  
  
 # ── TAB 4: Improve ───────────────────────────────────────────────────────────
-with tab_improve:
+if active_tab == "✍ Improve":
     if not llm_analysis:
         st.info("Add a Groq API key to unlock LLM-powered improvement suggestions.")
         st.stop()
@@ -742,7 +744,7 @@ with tab_improve:
  
  
 # ── TAB 5: Interview Prep ─────────────────────────────────────────────────────
-with tab_interview:
+if active_tab == "🎯 Interview Prep":
     if not interview_prep:
         st.info("Add a Groq API key to unlock interview prep.")
         st.stop()
