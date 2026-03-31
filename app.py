@@ -34,9 +34,15 @@ apply_theme()  # see styles.py for CSS definitions
 
 
 # ── Header ────────────────────────────────────────────────────────────────────
-st.markdown("## ◈ Resume × JD Fit Scorer")
 st.markdown(
-    "<p style='color:#6b7280;font-size:0.9rem;'>5-signal analysis · section-level insights · LLM-powered recommendations</p>",
+    """
+    <div style="text-align: center;">
+        <h2 style="margin-bottom: 0;">◈ Resume x Job Description Fit Analyzer</h2>
+        <p style="color:#6b7280; font-size:0.9rem; margin-top: 5px;">
+            5-signal analysis · Section-level insights · LLM-powered recommendations
+        </p>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
